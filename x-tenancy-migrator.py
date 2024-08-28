@@ -74,11 +74,23 @@ def get_block_volume_info_from_compartment(source_compartment):
         bv_client = oci.core.BlockstorageClient(config)
         block_volumes = bv_client.list_volumes(compartment_id=source_compartment)
         for bv in block_volumes.data:
-            print(f'block id: {bv.id}\nblock name: {bv.display_name}')
             block_volume_ids.append(bv.id)
             block_volume_names.append(bv.display_name)
     except Exception as e:
-        print(f"Error encountered getting boot volume info: {e}")
+        print(f"Error encountered getting block volume info: {e}")
+        sys.exit(1)
+
+def get_instance_info_from_compartment(source_compartment):
+    print("Getting compute info from compartment...")
+    try:
+        compute_client = oci.core.ComputeClient(config)
+        instances = compute_client.list_instances(source_compartment)
+        for vm in instances.data:
+            print(f'block id: {vm.id}\nblock name: {vm.display_name}')
+            block_volume_ids.append(vm.id)
+            block_volume_names.append(vm.display_name)
+    except Exception as e:
+        print(f"Error encountered getting instance info: {e}")
         sys.exit(1)
 
 def create_target_boot_volumes(target_compartment):
@@ -120,8 +132,9 @@ def create_target_block_volumes(target_compartment):
 def main():
     intro()
     volume_group, target_compartment, source_compartment = read_config()
-    get_boot_volume_info_from_compartment(source_compartment)
-    get_block_volume_info_from_compartment(source_compartment)
+    # get_boot_volume_info_from_compartment(source_compartment)
+    # get_block_volume_info_from_compartment(source_compartment)
+    get_instance_info_from_compartment(source_compartment)
     # get_boot_volume_info(volume_group)
     # get_block_volume_info(volume_group)
     # create_target_boot_volumes(target_compartment)
