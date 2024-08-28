@@ -15,11 +15,32 @@ function readini() {
 	source config.ini
 	echo -e "completed" 
 	echo -e 
+    #compute OCIDs or compartment OCID
 	echo Source Boot Volume Group OCID: ${VOLUMEGROUP}
     echo Target Compartment OCID: ${TARGETCOMPARTMENT}
 	echo -e
 	echo -e
 }
+
+#TODO add compute migration
+#TODO add volume backups migration
+
+#TODO function that gathers compute OCIDs in compartment
+
+#TODO function that gathers compute info from compute OCID
+
+#TODO fucntion that spins up compute with given information and associated boot volume
+
+#TODO function that attaches block volumes to corresponding compute instance
+
+#gather compute info by OCID or compartment OCID
+#store into computeIds
+#computeName
+#computeShape
+
+#needed to spin up VM
+# --private-ip 
+# 
 
 function getbootvolumeinfo() {
     echo -en "Getting boot volume info from volume group..." 
@@ -80,6 +101,8 @@ function createtargetblockvolumes() {
         # echo "Replication: $replicationOutput"
     done
 }
+
+
 
 echo -e "Migration complete!"
 
