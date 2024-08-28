@@ -14,23 +14,22 @@ def intro():
     print(f'x-tenancy-migrator v0.2')
 
 def read_config():
-    print("Reading config.ini...")
+    print("Reading configuration.ini...")
     config_parser = configparser.ConfigParser()
-    config_parser.read('config.ini')
+    config_parser.read('configuration.ini')
     volume_group = config_parser['DEFAULT']['VOLUMEGROUP']
     target_compartment = config_parser['DEFAULT']['TARGETCOMPARTMENT']
+    source_compartment = config_parser['DEFAULT']['SOURCECOMPARTMENT']
     print("completed\n")
     print(f"Source Boot Volume Group OCID: {volume_group}")
     print(f"Target Compartment OCID: {target_compartment}")
     print("\n\n")
-    return volume_group, target_compartment
+    return volume_group, target_compartment, source_compartment
 
-def get_boot_volume_info(volume_group, target_compartment):
+def get_boot_volume_info(volume_group):
     print("Getting boot volume info from volume group...")
     try:
         bv_client = oci.core.BlockstorageClient(config)
-        print(f'volume group ID: {volume_group}')
-        print(f'tenancy OCID: {config['tenancy']}')
         boot_volumes = bv_client.list_boot_volumes(volume_group_id=volume_group)
         
         for bv in boot_volumes.data:
@@ -55,6 +54,31 @@ def get_block_volume_info(volume_group):
         print("completed")
     except Exception as e:
         print(f"Error encountered getting block volume info: {e}")
+        sys.exit(1)
+
+def get_boot_volume_info_from_compartment(source_compartment):
+    print("Getting boot volume info from compartment...")
+    try:
+        bv_client = oci.core.BlockstorageClient(config)
+        boot_volumes = bv_client.list_boot_volumes(compartment_id=source_compartment)
+        for bv in boot_volumes.data:
+            boot_volume_ids.append(bv.id)
+            boot_volume_names.append(bv.display_name)
+    except Exception as e:
+        print(f"Error encountered getting boot volume info: {e}")
+        sys.exit(1)
+
+def get_block_volume_info_from_compartment(source_compartment):
+    print("Getting block volume info from compartment...")
+    try:
+        bv_client = oci.core.BlockstorageClient(config)
+        block_volumes = bv_client.list_volumes(compartment_id=source_compartment)
+        for bv in block_volumes.data:
+            print(f'block id: {bv.id}\nblock name: {bv.display_name}')
+            block_volume_ids.append(bv.id)
+            block_volume_names.append(bv.display_name)
+    except Exception as e:
+        print(f"Error encountered getting boot volume info: {e}")
         sys.exit(1)
 
 def create_target_boot_volumes(target_compartment):
@@ -95,11 +119,13 @@ def create_target_block_volumes(target_compartment):
 
 def main():
     intro()
-    volume_group, target_compartment = read_config()
-    get_boot_volume_info(volume_group, target_compartment)
-    get_block_volume_info(volume_group)
-    create_target_boot_volumes(target_compartment)
-    create_target_block_volumes(target_compartment)
+    volume_group, target_compartment, source_compartment = read_config()
+    get_boot_volume_info_from_compartment(source_compartment)
+    get_block_volume_info_from_compartment(source_compartment)
+    # get_boot_volume_info(volume_group)
+    # get_block_volume_info(volume_group)
+    # create_target_boot_volumes(target_compartment)
+    # create_target_block_volumes(target_compartment)
     print("Migration complete!")
 
 if __name__ == "__main__":
