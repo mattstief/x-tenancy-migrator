@@ -2,10 +2,6 @@ import oci
 import configparser
 import sys
 
-boot_volume_ids = []
-boot_volume_names = []
-block_volume_ids = []
-block_volume_names = []
 
 config = oci.config.from_file(profile_name='BRANDON')
 
@@ -26,119 +22,97 @@ def read_config():
     print("\n\n")
     return volume_group, target_compartment, source_compartment
 
-def get_boot_volume_info(volume_group):
-    print("Getting boot volume info from volume group...")
-    try:
-        bv_client = oci.core.BlockstorageClient(config)
-        boot_volumes = bv_client.list_boot_volumes(volume_group_id=volume_group)
-        
-        for bv in boot_volumes.data:
-            boot_volume_ids.append(bv.id)
-            boot_volume_names.append(bv.display_name)
-    except Exception as e:
-        print(f"Error encountered getting boot volume info: {e}")
-        sys.exit(1)
-    
-    print("completed")
+def get_boot_volumes_in_compartment(compartment):
+    print(f"Getting boot volume info in compartment {compartment}...")
+    bv_client = oci.core.BlockstorageClient(config)
+    boot_volumes = bv_client.list_boot_volumes(compartment_id=compartment).data
+    return boot_volumes
 
-def get_block_volume_info(volume_group):
-    print("Getting block volume info from volume group...")
-    try:
-        bv_client = oci.core.BlockstorageClient(config)
-        block_volumes = bv_client.list_volumes(volume_group_id=volume_group)
-        
-        for bv in block_volumes.data:
-            block_volume_ids.append(bv.id)
-            block_volume_names.append(bv.display_name)
-        
-        print("completed")
-    except Exception as e:
-        print(f"Error encountered getting block volume info: {e}")
-        sys.exit(1)
+def get_volumes_in_compartment(compartment):
+    print(f"Getting block volume info in compartment {compartment}...")
+    bv_client = oci.core.BlockstorageClient(config)
+    volumes = bv_client.list_volumes(compartment_id=compartment, lifecycle_state="AVAILABLE").data
+    return volumes
 
-def get_boot_volume_info_from_compartment(source_compartment):
-    print("Getting boot volume info from compartment...")
-    try:
-        bv_client = oci.core.BlockstorageClient(config)
-        boot_volumes = bv_client.list_boot_volumes(compartment_id=source_compartment)
-        for bv in boot_volumes.data:
-            boot_volume_ids.append(bv.id)
-            boot_volume_names.append(bv.display_name)
-    except Exception as e:
-        print(f"Error encountered getting boot volume info: {e}")
-        sys.exit(1)
-
-def get_block_volume_info_from_compartment(source_compartment):
-    print("Getting block volume info from compartment...")
-    try:
-        bv_client = oci.core.BlockstorageClient(config)
-        block_volumes = bv_client.list_volumes(compartment_id=source_compartment)
-        for bv in block_volumes.data:
-            block_volume_ids.append(bv.id)
-            block_volume_names.append(bv.display_name)
-    except Exception as e:
-        print(f"Error encountered getting block volume info: {e}")
-        sys.exit(1)
-
-def get_instance_info_from_compartment(source_compartment):
+def get_instance_info_from_compartment(compartment):
     print("Getting compute info from compartment...")
+    compute_client = oci.core.ComputeClient(config)
     try:
-        compute_client = oci.core.ComputeClient(config)
-        instances = compute_client.list_instances(source_compartment)
+        instances = compute_client.list_instances(compartment)
         for vm in instances.data:
-            print(f'block id: {vm.id}\nblock name: {vm.display_name}')
-            block_volume_ids.append(vm.id)
-            block_volume_names.append(vm.display_name)
+            print(f'\tinstance id: {vm.id}\tinstance name: {vm.display_name}')
     except Exception as e:
         print(f"Error encountered getting instance info: {e}")
         sys.exit(1)
 
-def create_target_boot_volumes(target_compartment):
+def create_target_boot_volumes(target_compartment, boot_volumes):
     print("Creating boot volumes in target tenancy...")
     bv_client = oci.core.BlockstorageClient(config)
-    for i in range(len(boot_volume_ids)):
+    for boot_volume in boot_volumes:
         try:
-            boot_volume_source_details = oci.core.models.BootVolumeSourceFromBootVolumeDetails(id=boot_volume_ids[i])
+            boot_volume_source_details = oci.core.models.BootVolumeSourceFromBootVolumeDetails(id=boot_volume.id)
             replication_output = bv_client.create_boot_volume(
                 oci.core.models.CreateBootVolumeDetails(
                     source_details=boot_volume_source_details,
                     compartment_id=target_compartment,
-                    display_name=boot_volume_names[i]
+                    display_name=boot_volume.display_name
                 )
             )
-            print(f"\tReplicated {boot_volume_names[i]}...")
+            print(f"\tReplicated {boot_volume.display_name}...")
         except Exception as e:
-            print(f"Error encountered while replicating {boot_volume_names[i]}: {e}")
+            print(f"Error encountered while replicating {boot_volume.display_name}: {e}")
             sys.exit(1)
 
-def create_target_block_volumes(target_compartment):
+def create_target_volumes(target_compartment, volumes):
     print("Creating block volumes in target tenancy...")
     bv_client = oci.core.BlockstorageClient(config)
-    for i in range(len(block_volume_ids)):
+    for volume in volumes:
         try:
-            block_volume_source_details = oci.core.models.VolumeSourceFromVolumeDetails(id=block_volume_ids[i])
+            volume_source_details = oci.core.models.VolumeSourceFromVolumeDetails(id=volume.id)
             replication_output = bv_client.create_volume(
                 oci.core.models.CreateVolumeDetails(
-                    source_details=block_volume_source_details,
+                    source_details=volume_source_details,
                     compartment_id=target_compartment,
-                    display_name=block_volume_names[i]
+                    display_name=volume.display_name
                 )
             )
-            print(f"\tReplicated {block_volume_names[i]}...")
+            print(f"\tReplicated {volume.display_name}...")
         except Exception as e:
-            print(f"Error encountered while replicating {block_volume_names[i]}: {e}")
+            print(f"Error encountered while replicating {volume.display_name}: {e}")
             sys.exit(1)
+
+def delete_boot_volumes_in_compartment(compartment, boot_volumes):
+    print(f"Deleting boot volumes in compartment {compartment}...")
+    bv_client = oci.core.BlockstorageClient(config)
+    for boot_volume in boot_volumes:
+        bv_client.delete_boot_volume(boot_volume_id=boot_volume.id)
+        print(f"\tDeleted boot volume {boot_volume.id}")
+
+def delete_volumes_in_compartment(compartment, volumes):
+    print(f"Deleting block volumes in compartment {compartment}...")
+    bv_client = oci.core.BlockstorageClient(config)
+    for volume in volumes:
+        bv_client.delete_volume(volume_id=volume.id)
+        print(f"\tDeleted volume {volume.id}")
 
 def main():
     intro()
+
     volume_group, target_compartment, source_compartment = read_config()
-    # get_boot_volume_info_from_compartment(source_compartment)
-    # get_block_volume_info_from_compartment(source_compartment)
-    get_instance_info_from_compartment(source_compartment)
-    # get_boot_volume_info(volume_group)
-    # get_block_volume_info(volume_group)
-    # create_target_boot_volumes(target_compartment)
-    # create_target_block_volumes(target_compartment)
+
+    ### uncomment this block to delete volumes in target compartment ###
+    # target_boot_volumes = get_boot_volumes_in_compartment(target_compartment)
+    # target_volumes = get_volumes_in_compartment(target_compartment)
+    # delete_boot_volumes_in_compartment(target_compartment, target_boot_volumes)
+    # delete_volumes_in_compartment(target_compartment, target_volumes)
+    # return
+
+    source_boot_volumes = get_boot_volumes_in_compartment(source_compartment)
+    source_volumes = get_volumes_in_compartment(source_compartment)
+    create_target_boot_volumes(target_compartment, source_boot_volumes)
+    create_target_volumes(target_compartment, source_volumes)
+    # get_instance_info_from_compartment(source_compartment)
+
     print("Migration complete!")
 
 if __name__ == "__main__":
